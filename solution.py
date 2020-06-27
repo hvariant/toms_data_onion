@@ -212,6 +212,23 @@ def layer4(fn):
 
     print(data.decode('utf8'))
 
+def layer5(fn):
+    import crypto_stuff
+
+    puzzle_input = decode_a86(fn)
+
+    kek = puzzle_input[:32]
+    wrapped_key_iv = puzzle_input[32:40]
+    wrapped_key_encrypted = puzzle_input[40:80]
+
+    wrapped_key = crypto_stuff.aes_key_unwrap(kek, wrapped_key_encrypted, wrapped_key_iv)
+
+    payload_iv = puzzle_input[80:96]
+    payload_encrypted = puzzle_input[96:]
+    payload = crypto_stuff.aes_decrypt(wrapped_key, payload_iv, payload_encrypted)
+
+    print(payload.decode('utf-8'))
+
 
 if __name__ == "__main__":
     layer = int(sys.argv[1])
@@ -227,5 +244,7 @@ if __name__ == "__main__":
         layer3(fn)
     if layer == 4:
         layer4(fn)
+    if layer == 5:
+        layer5(fn)
     else:
         print("not implemented yet")
