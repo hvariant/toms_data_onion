@@ -139,6 +139,80 @@ def layer3(fn):
         solution.extend([k ^ c for (k, c) in zip(key, puzzle_input[i*32:i*32 + 32])])
     print(solution.decode('utf-8'))
 
+def layer4(fn):
+    puzzle_input = decode_a86(fn)
+
+    data = bytearray()
+
+    def parse_udp_header(ip_cursor, ip_cursor_end):
+        udp_cursor = ip_cursor + 20
+        source_port = puzzle_input[udp_cursor] * 0x100 + puzzle_input[udp_cursor+1]
+        destination_port = puzzle_input[udp_cursor+2] * 0x100 + puzzle_input[udp_cursor+3]
+        length = puzzle_input[udp_cursor+4] * 0x100 + puzzle_input[udp_cursor+5]
+        checksum = puzzle_input[udp_cursor+6] * 0x100 + puzzle_input[udp_cursor+7]
+
+        s = 0
+        # udp header + data
+        for i in range(length//2):
+            e = puzzle_input[udp_cursor + 2*i] * 0x100 + puzzle_input[udp_cursor + 2*i + 1]
+            s += e
+        # padding
+        if length % 2 == 1:
+            s += puzzle_input[udp_cursor + length - 1] * 0x100
+        # pseudo header
+        for i in range(4):
+            s += puzzle_input[ip_cursor + 12 + 2 * i] * 0x100 + puzzle_input[ip_cursor + 12 + 2 * i + 1]
+        s += 0x11
+        s += length
+
+        while s & 0xf0000 > 0:
+            carry_over = (s & 0xf0000) >> 16
+            s = 0xffff & ((s & 0xffff) + carry_over)
+
+        if destination_port == 42069 and s == 0xffff:
+            data.extend(puzzle_input[udp_cursor + 8: udp_cursor + length])
+        return ip_cursor_end
+
+    def parse_ip_header(cursor):
+        checksum = puzzle_input[cursor+10] * 0x100 + puzzle_input[cursor+11]
+        total_length = puzzle_input[cursor+2] * 0x100 + puzzle_input[cursor+3]
+        source_address = "{}.{}.{}.{}".format(
+            puzzle_input[cursor+12],
+            puzzle_input[cursor+13],
+            puzzle_input[cursor+14],
+            puzzle_input[cursor+15],
+        )
+        destination_address = "{}.{}.{}.{}".format(
+            puzzle_input[cursor+16],
+            puzzle_input[cursor+17],
+            puzzle_input[cursor+18],
+            puzzle_input[cursor+19],
+        )
+
+        s = 0
+        for i in range(10):
+            e = puzzle_input[cursor + 2*i] * 0x100 + puzzle_input[cursor + 2*i + 1]
+            s += e
+
+        while s & 0xf0000 > 0:
+            carry_over = (s & 0xf0000) >> 16
+            s = 0xffff & ((s & 0xffff) + carry_over)
+
+        if (s == 0xffff
+            and source_address == "10.1.1.10"
+            and destination_address == "10.1.1.200"
+        ):
+            return parse_udp_header(cursor, cursor + total_length)
+        else:
+            return cursor + total_length
+
+    cursor = 0
+    while cursor < len(puzzle_input):
+        cursor = parse_ip_header(cursor)
+
+    print(data.decode('utf8'))
+
+
 if __name__ == "__main__":
     layer = int(sys.argv[1])
     fn = sys.argv[2]
@@ -151,5 +225,7 @@ if __name__ == "__main__":
         layer2(fn)
     if layer == 3:
         layer3(fn)
+    if layer == 4:
+        layer4(fn)
     else:
         print("not implemented yet")
